@@ -1,1 +1,0 @@
-# college-admission-ai-assistant
