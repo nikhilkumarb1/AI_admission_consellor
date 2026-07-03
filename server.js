@@ -504,64 +504,67 @@ Return format:
 
 const FORM_LINK = "https://forms.gle/2XEo8vgP79yWVAF3A";
 
+function isNegativeIntent(message) {
+  const text = normalize(message);
+  return ["no", "nope", "not now", "later", "maybe later"].includes(text);
+}
+
 async function handleStudentMessage(message, phone = "") {
   const sessionId = getSessionId(phone);
   let memory = getConversation(sessionId);
 
   updateConversation(sessionId, message);
-
   memory = getConversation(sessionId);
 
   const entities = await extractEntities(message, memory);
 
-if (entities.campus) memory.campus = entities.campus;
-if (entities.course) memory.course = entities.course;
-if (entities.topic && entities.topic !== "General") memory.lastTopic = entities.topic;
+  if (entities.campus) memory.campus = entities.campus;
+  if (entities.course) memory.course = entities.course;
+  if (entities.topic && entities.topic !== "General") memory.lastTopic = entities.topic;
 
-const newCampus = detectCampus(message);
-const newCourse = detectCourse(message);
-const newTopic = detectTopic(message);
+  const newCampus = detectCampus(message);
+  const newCourse = detectCourse(message);
+  const newTopic = detectTopic(message);
 
-if (newCampus) memory.campus = newCampus;
-if (newCourse) memory.course = newCourse;
-if (newTopic !== "General") memory.lastTopic = newTopic;
+  if (newCampus) memory.campus = newCampus;
+  if (newCourse) memory.course = newCourse;
+  if (newTopic !== "General") memory.lastTopic = newTopic;
 
-  const documentType = detectDocument(message);
-
-if (documentType && memory.stage === "documents_pending") {
-  memory.documents[documentType] = true;
-
-  const missingDocs = getMissingDocuments(memory);
-
-  if (missingDocs.length === 0) {
-    memory.stage = "ready_for_counselor";
-
-    await updateLeadStatus(
-    memory.phone || phone,
-    "Ready for Counselor"
-);
+  // Step 3: after details saved, user says Yes/Proceed => send form link
+  if (memory.stage === "details_received" && isApplyIntent(message)) {
+    memory.stage = "documents_pending";
 
     return {
-      type: "documents_complete",
+      type: "form_link",
       memory,
       answer:
-        "All required documents received ✅\n\nYour application is now ready for counselor verification. Our counselor will contact you shortly."
+        `Perfect! ✅\n\n` +
+        `Please upload your admission documents using the link below:\n\n` +
+        `${FORM_LINK}\n\n` +
+        `Required Documents:\n` +
+        `• 10th Marksheet\n` +
+        `• 12th Marksheet\n` +
+        `• Aadhaar Card\n` +
+        `• Passport Size Photo\n\n` +
+        `Our counselor will verify your documents and contact you shortly.`
     };
   }
 
-  return {
-    type: "document_received",
-    memory,
-    answer:
-      `${documentLabel(documentType)} received ✅\n\n` +
-      `Please upload remaining documents:\n` +
-      missingDocs.map((doc) => `• ${documentLabel(doc)}`).join("\n")
-  };
-}
+  // Step 3 alternate: user says No/Later
+  if (memory.stage === "details_received" && isNegativeIntent(message)) {
+    memory.stage = "counselor_followup";
 
-  if (isApplyIntent(message)) {
+    return {
+      type: "handoff",
+      memory,
+      answer:
+        `No problem. Our counselor will call you shortly for more queries.`
+    };
+  }
+
+  // Step 2: user has shared details after bot asked
+  if (memory.stage === "collecting_details") {
     const details = await extractLeadDetails(message);
-
     memory = updateConversation(sessionId, message, details);
 
     const lead = {
@@ -575,52 +578,41 @@ if (documentType && memory.stage === "documents_pending") {
 
     await saveLead(lead);
 
-
-    memory.stage = "documents_pending";
+    memory.stage = "details_received";
 
     return {
-      type: "lead",
+      type: "lead_saved",
       memory,
       answer:
-  `Great! Your admission interest has been saved ✅\n\n` +
-  `Details received:\n` +
-  `Name: ${lead.name || "Not provided"}\n` +
-  `Phone: ${lead.phone || "Not provided"}\n` +
-  `Email: ${lead.email || "Not provided"}\n` +
-  `Campus: ${lead.campus || "Not provided"}\n` +
-  `Course: ${lead.course || "Not provided"}\n\n` +
-   `Please upload your admission documents using the secure Google Form:\n\n` +
-  `${FORM_LINK}\n\n` +
-  `• 10th Marksheet\n` +
-  `• 12th Marksheet\n` +
-  `• Aadhaar Card\n` +
-  `• Passport Size Photo\n\n` +
-  `Optional: CUET/JEE Scorecard`
+        `Thank you! ✅\n\n` +
+        `Your details have been received successfully.\n\n` +
+        `Can we begin with the admission process?`
+    };
+  }
+
+  // Step 1: user says Yes/Interested/Apply => ask for details only
+  if (isApplyIntent(message)) {
+    memory.stage = "collecting_details";
+
+    return {
+      type: "collecting_details",
+      memory,
+      answer:
+        `Great! 🎉\n\n` +
+        `Please share the following details:\n\n` +
+        `👤 Full Name\n` +
+        `📞 Phone Number\n` +
+        `📧 Email ID\n` +
+        `🏫 Preferred Campus\n` +
+        `🎓 Preferred Course\n\n` +
+        `Example:\n` +
+        `My name is Nikhil Kumar, phone 9876543210, email nikhil@gmail.com, campus Lucknow, course BTech CSE`
     };
   }
 
   const data = await loadSheetData();
 
-  const messageWithMemory = `
-Student current message: ${message}
-
-Known conversation memory:
-Campus: ${memory.campus || "Not provided"}
-Course: ${memory.course || "Not provided"}
-Topic: ${memory.lastTopic || "Not provided"}
-Name: ${memory.name || "Not provided"}
-Email: ${memory.email || "Not provided"}
-Phone: ${memory.phone || "Not provided"}
-
-Use this memory if the student asks short questions like "fees?", "hostel?", "placement?".
-Use memory if student asks follow-ups like:
-- what about noida?
-- and jaipur?
-- hostel?
-- fees?
-`;
-
-const searchMessage = `
+  const searchMessage = `
 Student current message: ${message}
 
 Final context:
@@ -629,17 +621,18 @@ Course: ${memory.course || "Not provided"}
 Topic: ${memory.lastTopic || "Not provided"}
 `;
 
+  console.log("\n========== MEMORY ==========");
+  console.log(memory);
 
-console.log("\n========== MEMORY ==========");
-console.log(memory);
+  console.log("\n========== USER MESSAGE ==========");
+  console.log(message);
 
-console.log("\n========== USER MESSAGE ==========");
-console.log(message);
+  const searchResult = findRelevantRows(data, message, memory, entities);
 
-const searchResult = findRelevantRows(data, message, memory, entities);
-console.log("\n========== SEARCH ==========");
-console.log(searchResult);
-const answer = await formatAnswer(searchMessage, searchResult);
+  console.log("\n========== SEARCH ==========");
+  console.log(searchResult);
+
+  const answer = await formatAnswer(searchMessage, searchResult);
 
   return {
     type: "answer",
