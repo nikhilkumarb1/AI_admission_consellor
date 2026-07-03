@@ -632,19 +632,67 @@ Topic: ${memory.lastTopic || "Not provided"}
   console.log("\n========== SEARCH ==========");
   console.log(searchResult);
 
-  const answer = await formatAnswer(searchMessage, searchResult);
-
+  // Ask for campus if missing
+if (
+  searchResult.topic !== "General" &&
+  !searchResult.campus &&
+  ["Fees", "Hostel", "Placement", "Scholarship", "Admission_Process"].includes(searchResult.topic)
+) {
   return {
-    type: "answer",
+    type: "missing_campus",
     memory,
-    detected: {
-      campus: searchResult.campus,
-      course: searchResult.course,
-      topic: searchResult.topic,
-    },
-    matched_rows: searchResult.rows.length,
-    answer,
+    answer:
+      `The information depends on the campus.\n\n` +
+      `Could you please tell me which Amity campus you're interested in?\n\n` +
+      `• Noida\n` +
+      `• Lucknow\n` +
+      `• Jaipur\n` +
+      `• Mumbai\n` +
+      `• Bengaluru\n` +
+      `• Raipur\n` +
+      `• Mohali\n` +
+      `• Gwalior\n` +
+      `• Gurgaon\n` +
+      `• Hyderabad`
   };
+}
+
+
+// Ask for course if missing
+if (
+  searchResult.topic === "Fees" &&
+  searchResult.campus &&
+  !searchResult.course
+) {
+  return {
+    type: "missing_course",
+    memory,
+    answer:
+      `Sure! Which course are you interested in?\n\n` +
+      `• B.Tech CSE\n` +
+      `• B.Tech AI & ML\n` +
+      `• B.Tech IT\n` +
+      `• BBA\n` +
+      `• B.Sc\n` +
+      `• BCA\n` +
+      `• MBA\n` +
+      `• MCA`
+  };
+}
+
+const answer = await formatAnswer(searchMessage, searchResult);
+
+return {
+  type: "answer",
+  memory,
+  detected: {
+    campus: searchResult.campus,
+    course: searchResult.course,
+    topic: searchResult.topic,
+  },
+  matched_rows: searchResult.rows.length,
+  answer,
+};
 }
 
 app.post("/test", async (req, res) => {
