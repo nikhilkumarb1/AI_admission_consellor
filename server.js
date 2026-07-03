@@ -530,6 +530,25 @@ async function handleStudentMessage(message, phone = "") {
   if (newCourse) memory.course = newCourse;
   if (newTopic !== "General") memory.lastTopic = newTopic;
 
+  if (memory.campus === "noida") {
+  return {
+    type: "noida_reserved",
+    memory,
+    answer:
+      `Sorry, seats for Amity Noida are currently reserved.\n\n` +
+      `You can choose another campus:\n` +
+      `• Lucknow\n` +
+      `• Jaipur\n` +
+      `• Mumbai\n` +
+      `• Bengaluru\n` +
+      `• Raipur\n` +
+      `• Mohali\n` +
+      `• Gurgaon\n` +
+      `• Gwalior\n` +
+      `• Hyderabad`
+  };
+}
+
   // Step 3: after details saved, user says Yes/Proceed => send form link
   if (memory.stage === "details_received" && isApplyIntent(message)) {
     memory.stage = "documents_pending";
