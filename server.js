@@ -606,7 +606,7 @@ async function handleStudentMessage(message, phone = "") {
         `🏫 Preferred Campus\n` +
         `🎓 Preferred Course\n\n` +
         `Example:\n` +
-        `My name is Nikhil Kumar, phone 9876543210, email nikhil@gmail.com, campus Lucknow, course BTech CSE`
+        `My name is John Doe, phone 9876543210, email john.doe@gmail.com, campus Lucknow, course BTech CSE`
     };
   }
 
