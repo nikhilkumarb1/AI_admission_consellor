@@ -264,6 +264,9 @@ function isApplyIntent(message) {
   const text = normalize(message);
 
   return (
+    text === "yes" ||
+    text === "yes interested" ||
+    text === "yes i am interested" ||
     text.includes("apply") ||
     text.includes("admission") ||
     text.includes("register") ||
