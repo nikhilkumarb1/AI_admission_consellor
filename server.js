@@ -80,25 +80,36 @@ async function loadSheetData() {
 async function saveLead({ name, phone, email, campus, course, message }) {
   const sheets = await getSheetsClient();
 
-  await sheets.spreadsheets.values.append({
-    spreadsheetId: process.env.GOOGLE_SHEET_ID,
-    range: "Leads!A:H",
-    valueInputOption: "USER_ENTERED",
-    requestBody: {
-      values: [
-        [
-          new Date().toLocaleString("en-IN"),
-          name || "",
-          phone || "",
-          email || "",
-          campus || "",
-          course || "",
-          message || "",
-          "New Lead",
-        ],
+  const indiaTimestamp = new Date().toLocaleString("en-IN", {
+  timeZone: "Asia/Kolkata",
+  day: "2-digit",
+  month: "2-digit",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+  hour12: true,
+});
+
+await sheets.spreadsheets.values.append({
+  spreadsheetId: process.env.GOOGLE_SHEET_ID,
+  range: "Leads!A:H",
+  valueInputOption: "USER_ENTERED",
+  requestBody: {
+    values: [
+      [
+        indiaTimestamp,
+        name || "",
+        phone || "",
+        email || "",
+        campus || "",
+        course || "",
+        message || "",
+        "New Lead",
       ],
-    },
-  });
+    ],
+  },
+});
 }
 
 async function updateLeadStatus(phone, status) {
