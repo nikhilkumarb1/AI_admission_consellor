@@ -742,7 +742,7 @@ if (isStopIntent(message)) {
     answer:
       status === "Already Admitted"
         ? `Thank you for letting us know. ✅\n\nWe have updated your status as already admitted.`
-        : `No problem. ✅\n\nWe have updated your status as not interested. You will not receive further bot replies.`
+        : `Thank you for your response. I completely understand. If you ever plan to pursue higher education in the future, feel free to contact me. Wishing you all the best!.`
   };
 }
 
