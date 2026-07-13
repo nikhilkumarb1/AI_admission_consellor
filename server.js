@@ -552,6 +552,29 @@ function getCounselorPhones() {
     .filter((phone) => phone && phone.length >= 12);
 }
 
+function isStopIntent(message) {
+  const text = normalize(message);
+
+  return (
+    text === "stop" ||
+    text === "unsubscribe" ||
+    text.includes("not interested") ||
+    text.includes("not intrested") ||
+    text.includes("i am not interested") ||
+    text.includes("i'm not interested") ||
+    text.includes("already taken admission") ||
+    text.includes("already take admission") ||
+    text.includes("i have taken admission") ||
+    text.includes("i already took admission") ||
+    text.includes("i already take admission") ||
+    text.includes("admission ho gaya") ||
+    text.includes("mera admission ho gaya") ||
+    text.includes("dont message") ||
+    text.includes("don't message") ||
+    text.includes("do not message") ||
+    text.includes("remove me")
+  );
+}
 
 async function handleStudentMessage(message, phone = "") {
   const sessionId = getSessionId(phone);
@@ -592,6 +615,57 @@ async function handleStudentMessage(message, phone = "") {
       `• Hyderabad`
   };
 }
+
+
+// 1. Stop/Not interested check
+if (memory.stage === "stopped") {
+  return {
+    type: "stopped",
+    memory,
+    answer: ""
+  };
+}
+
+if (isStopIntent(message)) {
+  memory.stage = "stopped";
+
+  const status = normalize(message).includes("admission")
+    ? "Already Admitted"
+    : "Not Interested";
+
+  const lead = {
+    name: memory.name || "",
+    phone: memory.phone || phone || "",
+    email: memory.email || "",
+    campus: memory.campus || "",
+    course: memory.course || "",
+    message: `[${status}] ${message}`,
+  };
+
+  await saveLead(lead);
+
+  await updateLeadStatus(memory.phone || phone, status).catch(() => {});
+
+  return {
+    type: "student_stopped",
+    memory,
+    answer:
+      status === "Already Admitted"
+        ? `Thank you for letting us know. ✅\n\nWe have updated your status as already admitted.`
+        : `No problem. ✅\n\nWe have updated your status as not interested. You will not receive further bot replies.`
+  };
+}
+
+
+// 2. Counselor handoff check
+if (memory.stage === "counselor_handoff") {
+  return {
+    type: "counselor_handoff_hold",
+    memory,
+    answer: ""
+  };
+}
+
 
 // If already handed over, stop AI replies
 if (memory.stage === "counselor_handoff") {
