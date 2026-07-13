@@ -80,7 +80,7 @@ async function loadSheetData() {
 async function saveLead({ name, phone, email, campus, course, message }) {
   const sheets = await getSheetsClient();
 
-  const indiaTimestamp = new Date().toLocaleString("en-IN", {
+  const indiaTimestamp = new Date().toLocaleString("en-IN",{
   timeZone: "Asia/Kolkata",
   day: "2-digit",
   month: "2-digit",
@@ -834,7 +834,9 @@ if (counselorPhones.length) {
     memory,
     answer:
       `Sure, I’m connecting you with our admission counselor. ✅\n\n` +
-      `Our counselor will contact you shortly for further assistance.`
+      `Kindly call our admission counselor\n\n` +
+      `Mr. Rahul Diwan - 76693 15881 - Admission Manager\n` +
+      `Ms. Jaya - 87965 32575 - Education Counselor`
   };
 }
 
