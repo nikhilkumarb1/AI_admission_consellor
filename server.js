@@ -576,6 +576,96 @@ function isStopIntent(message) {
   );
 }
 
+function isFeeObjection(message) {
+  const text = normalize(message);
+
+  return (
+    text.includes("fee is high") ||
+    text.includes("fees is high") ||
+    text.includes("fees are high") ||
+    text.includes("too high") ||
+    text.includes("very high") ||
+    text.includes("expensive") ||
+    text.includes("costly") ||
+    text.includes("zyada hai") ||
+    text.includes("bahut zyada") ||
+    text.includes("budget se bahar") ||
+    text.includes("out of budget") ||
+    text.includes("not affordable") ||
+    text.includes("affordable")
+  );
+}
+
+function extractBudgetInLakhs(message) {
+  const text = normalize(message).replace(/,/g, "");
+
+  let match = text.match(/(\d+(\.\d+)?)\s*(lakh|lakhs|lac|lacs|lak)/);
+  if (match) return Number(match[1]);
+
+  match = text.match(/(\d+(\.\d+)?)\s*(cr|crore|crores)/);
+  if (match) return Number(match[1]) * 100;
+
+  match = text.match(/(\d+(\.\d+)?)/);
+  if (match) {
+    const value = Number(match[1]);
+
+    // If student says 800000, convert to 8 lakh
+    if (value >= 100000) return value / 100000;
+
+    // If student says 8 or 10, assume lakh
+    if (value <= 100) return value;
+  }
+
+  return null;
+}
+
+function extractFeeInLakhs(feeText) {
+  const text = normalize(feeText).replace(/,/g, "");
+
+  let match = text.match(/(\d+(\.\d+)?)\s*(lakh|lakhs|lac|lacs|lak)/);
+  if (match) return Number(match[1]);
+
+  match = text.match(/(\d+(\.\d+)?)\s*(cr|crore|crores)/);
+  if (match) return Number(match[1]) * 100;
+
+  return null;
+}
+
+function getAffordableOptions(data, budgetLakhs, course = "") {
+  const options = [];
+
+  for (const row of data) {
+    const fee = extractFeeInLakhs(row.Fees || row.Fee || "");
+
+    if (!fee) continue;
+
+    const rowText = normalize(Object.values(row).join(" "));
+    const courseText = normalize(course);
+
+    if (courseText) {
+      const courseWords = courseText.split(" ").filter((w) => w.length > 1);
+      const courseMatched = courseWords.every((word) => rowText.includes(word));
+
+      if (!courseMatched) continue;
+    }
+
+    // Show options under budget or slightly above budget by 10%
+    if (fee <= budgetLakhs * 1.1) {
+      options.push({
+        college: row.College || "Amity University",
+        campus: row.Campus || "",
+        course: row.Course || row.Courses || "",
+        fee,
+        feeText: row.Fees || "",
+      });
+    }
+  }
+
+  return options
+    .sort((a, b) => a.fee - b.fee)
+    .slice(0, 5);
+}
+
 async function handleStudentMessage(message, phone = "") {
   const sessionId = getSessionId(phone);
   let memory = getConversation(sessionId);
@@ -736,6 +826,78 @@ if (counselorPhones.length) {
       `Our counselor will contact you shortly for further assistance.`
   };
 }
+
+// Student says fee is high / expensive
+if (isFeeObjection(message)) {
+  memory.stage = "asking_budget";
+
+  return {
+    type: "budget_ask",
+    memory,
+    answer:
+      `I understand, fees can be a concern.\n\n` +
+      `What is your approximate budget for the course?\n\n` +
+      `Example:\n` +
+      `• 8 Lakhs\n` +
+      `• 10 Lakhs\n` +
+      `• 12 Lakhs`
+  };
+}
+
+// Student gives budget after fee objection
+if (memory.stage === "asking_budget") {
+  const budgetLakhs = extractBudgetInLakhs(message);
+
+  if (!budgetLakhs) {
+    return {
+      type: "budget_missing",
+      memory,
+      answer:
+        `Please share your approximate budget in lakhs.\n\n` +
+        `Example: 8 Lakhs, 10 Lakhs, 12 Lakhs`
+    };
+  }
+
+  const data = await loadSheetData();
+
+  const affordableOptions = getAffordableOptions(
+    data,
+    budgetLakhs,
+    memory.course || ""
+  );
+
+  memory.stage = "budget_suggested";
+
+  if (!affordableOptions.length) {
+    return {
+      type: "no_budget_options",
+      memory,
+      answer:
+        `Based on your budget of ${budgetLakhs} Lakhs, I couldn't find an exact matching option in the current data.\n\n` +
+        `But I can connect you with a counselor who can suggest scholarships, flexible options, or nearby alternatives.`
+    };
+  }
+
+  const optionText = affordableOptions
+    .map((item, index) => {
+      return (
+        `${index + 1}. ${item.campus || item.college}\n` +
+        `Course: ${item.course || "Available course"}\n` +
+        `Fees: ${item.feeText || item.fee + " Lakhs"}`
+      );
+    })
+    .join("\n\n");
+
+  return {
+    type: "budget_options",
+    memory,
+    answer:
+      `Based on your budget of around ${budgetLakhs} Lakhs, these options may be suitable:\n\n` +
+      `${optionText}\n\n` +
+      `Would you like to connect with a counselor for scholarship or admission guidance?`
+  };
+}
+
 
   // Step 3: after details saved, user says Yes/Proceed => send form link
   if (memory.stage === "details_received" && isApplyIntent(message)) {
