@@ -273,6 +273,30 @@ function isApplyIntent(message) {
     text.includes("proceed") ||
     text.includes("interested") ||
     text.includes("call me")
+    );
+}
+
+function isCounselorIntent(message) {
+  const text = normalize(message);
+
+  return (
+    text.includes("connect to counsellor") ||
+    text.includes("connect to counselor") ||
+    text.includes("connect me to counsellor") ||
+    text.includes("connect me to counselor") ||
+    text.includes("talk to counsellor") ||
+    text.includes("talk to counselor") ||
+    text.includes("speak to counsellor") ||
+    text.includes("speak to counselor") ||
+    text.includes("counsellor call") ||
+    text.includes("counselor call") ||
+    text.includes("counseller") ||
+    text.includes("counsellor") ||
+    text.includes("counselor") ||
+    text.includes("human agent") ||
+    text.includes("talk to human") ||
+    text.includes("connect with human") ||
+    text.includes("call me")
   );
 }
 
@@ -509,6 +533,18 @@ function isNegativeIntent(message) {
   return ["no", "nope", "not now", "later", "maybe later"].includes(text);
 }
 
+function formatWhatsAppPhone(phone) {
+  let digits = String(phone || "").replace(/\D/g, "");
+
+  // If Indian 10 digit number, add 91
+  if (digits.length === 10) {
+    digits = "91" + digits;
+  }
+
+  return digits;
+}
+
+
 async function handleStudentMessage(message, phone = "") {
   const sessionId = getSessionId(phone);
   let memory = getConversation(sessionId);
@@ -546,6 +582,63 @@ async function handleStudentMessage(message, phone = "") {
       `• Gurgaon\n` +
       `• Gwalior\n` +
       `• Hyderabad`
+  };
+}
+
+// If already handed over, stop AI replies
+if (memory.stage === "counselor_handoff") {
+  return {
+    type: "counselor_handoff_hold",
+    memory,
+    answer: ""
+  };
+}
+
+// Student asks for counselor
+if (isCounselorIntent(message)) {
+  memory.stage = "counselor_handoff";
+
+  const lead = {
+    name: memory.name || "",
+    phone: memory.phone || phone || "",
+    email: memory.email || "",
+    campus: memory.campus || "",
+    course: memory.course || "",
+    message: `[Counselor Requested] ${message}`,
+  };
+
+  await saveLead(lead);
+
+  await updateLeadStatus(memory.phone || phone, "Counselor Requested").catch(() => {});
+
+  const counselorMessage =
+    `🚨 Counselor Requested\n\n` +
+    `A student wants to talk to a counselor.\n\n` +
+    `Student Phone: ${memory.phone || phone || "Not available"}\n` +
+    `Name: ${memory.name || "Not provided"}\n` +
+    `Campus: ${memory.campus || "Not provided"}\n` +
+    `Course: ${memory.course || "Not provided"}\n` +
+    `Message: ${message}\n\n` +
+    `Please check AiSensy chat / Leads Google Sheet and follow up.`;
+
+ const counselorPhone = formatWhatsAppPhone(process.env.COUNSELOR_PHONE);
+
+console.log("Sending counselor alert to:", counselorPhone);
+
+if (counselorPhone && counselorPhone.length >= 12) {
+  await sendAiSensyReply(counselorPhone, counselorMessage).catch((err) => {
+    console.log("Counselor alert failed:", err.response?.data || err.message);
+  });
+} else {
+  console.log("Invalid COUNSELOR_PHONE in .env");
+}
+
+  return {
+    type: "counselor_handoff",
+    memory,
+    answer:
+      `Sure, I’m connecting you with our admission counselor. ✅\n\n` +
+      `Our counselor will contact you shortly for further assistance.`
   };
 }
 
@@ -793,8 +886,12 @@ app.post("/webhook/aisensy", async (req, res) => {
 
     const result = await handleStudentMessage(message, phone);
 
-   await sendAiSensyReply(phone, result.answer);
-   console.log("AI Reply Sent:", result.answer);
+   if (result.answer && result.answer.trim()) {
+  await sendAiSensyReply(phone, result.answer);
+  console.log("AI Reply Sent:", result.answer);
+} else {
+  console.log("AI reply skipped because student is handed over to counselor");
+}
 
     return res.status(200).send("OK");
   } catch (error) {
