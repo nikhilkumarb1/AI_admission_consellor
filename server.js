@@ -536,12 +536,20 @@ function isNegativeIntent(message) {
 function formatWhatsAppPhone(phone) {
   let digits = String(phone || "").replace(/\D/g, "");
 
-  // If Indian 10 digit number, add 91
   if (digits.length === 10) {
     digits = "91" + digits;
   }
 
   return digits;
+}
+
+function getCounselorPhones() {
+  const phones = process.env.COUNSELOR_PHONES || process.env.COUNSELOR_PHONE || "";
+
+  return phones
+    .split(",")
+    .map((phone) => formatWhatsAppPhone(phone))
+    .filter((phone) => phone && phone.length >= 12);
 }
 
 
@@ -611,26 +619,39 @@ if (isCounselorIntent(message)) {
 
   await updateLeadStatus(memory.phone || phone, "Counselor Requested").catch(() => {});
 
-  const counselorMessage =
-    `🚨 Counselor Requested\n\n` +
-    `A student wants to talk to a counselor.\n\n` +
-    `Student Phone: ${memory.phone || phone || "Not available"}\n` +
-    `Name: ${memory.name || "Not provided"}\n` +
-    `Campus: ${memory.campus || "Not provided"}\n` +
-    `Course: ${memory.course || "Not provided"}\n` +
-    `Message: ${message}\n\n` +
-    `Please check AiSensy chat / Leads Google Sheet and follow up.`;
+  const lastChat = memory.lastMessages
+  ?.slice(-5)
+  .map((msg, index) => `${index + 1}. ${msg}`)
+  .join("\n");
 
- const counselorPhone = formatWhatsAppPhone(process.env.COUNSELOR_PHONE);
+const studentPhone = formatWhatsAppPhone(memory.phone || phone);
 
-console.log("Sending counselor alert to:", counselorPhone);
+const counselorMessage =
+  `🚨 Counselor Requested\n\n` +
+  `A student wants to talk to a counselor.\n\n` +
+  `Student Phone: ${studentPhone || "Not available"}\n` +
+  `Name: ${memory.name || "Not provided"}\n` +
+  `Campus: ${memory.campus || "Not provided"}\n` +
+  `Course: ${memory.course || "Not provided"}\n\n` +
+  `Student Query:\n${message}\n\n` +
+  `Last Chat:\n${lastChat || "No previous chat available"}\n\n` +
+  `Action:\nOpen AiSensy Inbox and reply to this student manually.`;
 
-if (counselorPhone && counselorPhone.length >= 12) {
-  await sendAiSensyReply(counselorPhone, counselorMessage).catch((err) => {
-    console.log("Counselor alert failed:", err.response?.data || err.message);
-  });
+const counselorPhones = getCounselorPhones();
+
+if (counselorPhones.length) {
+  for (const counselorPhone of counselorPhones) {
+    console.log("Sending counselor alert to:", counselorPhone);
+
+    await sendAiSensyReply(counselorPhone, counselorMessage).catch((err) => {
+      console.log(
+        `Counselor alert failed for ${counselorPhone}:`,
+        err.response?.data || err.message
+      );
+    });
+  }
 } else {
-  console.log("Invalid COUNSELOR_PHONE in .env");
+  console.log("No valid counselor phone numbers found in .env");
 }
 
   return {
@@ -883,6 +904,14 @@ app.post("/webhook/aisensy", async (req, res) => {
     if (!message || !phone) {
       return res.status(200).send("OK");
     }
+
+const incomingPhone = formatWhatsAppPhone(phone);
+const counselorPhones = getCounselorPhones();
+
+if (counselorPhones.includes(incomingPhone)) {
+  console.log("Ignoring counselor phone message:", incomingPhone);
+  return res.status(200).send("OK");
+}
 
     const result = await handleStudentMessage(message, phone);
 
