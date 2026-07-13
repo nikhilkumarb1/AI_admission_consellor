@@ -264,7 +264,6 @@ function isApplyIntent(message) {
   const text = normalize(message);
 
   return (
-    text === "yes" ||
     text === "yes interested" ||
     text === "yes i am interested" ||
     text.includes("apply") ||
@@ -280,6 +279,7 @@ function isCounselorIntent(message) {
   const text = normalize(message);
 
   return (
+    text.includes("yes") ||
     text.includes("connect to counsellor") ||
     text.includes("connect to counselor") ||
     text.includes("connect me to counsellor") ||
@@ -739,7 +739,7 @@ if (counselorPhones.length) {
         `🏫 Preferred Campus\n` +
         `🎓 Preferred Course\n\n` +
         `Example:\n` +
-        `My name is John Doe, phone 9876543210, email john.doe@gmail.com, campus Lucknow, course BTech CSE`
+        `My name is John Doe, phone 9999999999, email john.doe@gmail.com, campus Lucknow, course BTech CSE`
     };
   }
 
