@@ -785,15 +785,6 @@ async function handleStudentMessage(message, phone = "") {
   updateConversation(sessionId, message);
   memory = getConversation(sessionId);
 
-
-  if (memory.stage === "human_intervened") {
-  return {
-    type: "human_intervened",
-    memory,
-    answer: ""
-  };
-}
-
   const entities = await extractEntities(message, memory);
 
   if (entities.campus) memory.campus = entities.campus;
@@ -1323,79 +1314,10 @@ async function sendAiSensyReply(phone, message) {
   return response.data;
 }
 
-function getPhoneFromAiSensyPayload(body) {
-  return formatWhatsAppPhone(
-    body.data?.message?.phone_number ||
-    body.data?.phone_number ||
-    body.data?.contact?.phone_number ||
-    body.data?.user?.phone_number ||
-    body.phone ||
-    ""
-  );
-}
-
-function isAiSensyInterventionEvent(body) {
-  const text = JSON.stringify(body || {}).toLowerCase();
-
-  return (
-    text.includes("interven") ||
-    text.includes("human") ||
-    text.includes("agent") ||
-    text.includes("assigned") ||
-    text.includes("manual")
-  );
-}
-
-function isAiSensyResolveEvent(body) {
-  const text = JSON.stringify(body || {}).toLowerCase();
-
-  return (
-    text.includes("resolve") ||
-    text.includes("resolved") ||
-    text.includes("conversation_resolved") ||
-    text.includes("chat_resolved")
-  );
-}
-
 app.post("/webhook/aisensy", async (req, res) => {
   try {
     const body = req.body;
     const topic = body.topic;
-
-    console.log("AiSensy Webhook Topic:", topic);
-    console.log("AiSensy Full Payload:", JSON.stringify(body, null, 2));
-
-    if (isAiSensyResolveEvent(body)) {
-  const resolvedPhone = getPhoneFromAiSensyPayload(body);
-
-  if (resolvedPhone) {
-    const memory = getConversation(resolvedPhone);
-    memory.stage = "new";
-    conversations.set(resolvedPhone, memory);
-
-    console.log("Chat resolved. AI resumed for:", resolvedPhone);
-  } else {
-    console.log("Resolve event detected but phone not found");
-  }
-
-  return res.status(200).send("OK");
-}
-
-    if (isAiSensyInterventionEvent(body)) {
-  const intervenedPhone = getPhoneFromAiSensyPayload(body);
-
-  if (intervenedPhone) {
-    const memory = getConversation(intervenedPhone);
-    memory.stage = "human_intervened";
-    conversations.set(intervenedPhone, memory);
-
-    console.log("Human intervened. AI stopped for:", intervenedPhone);
-  } else {
-    console.log("Intervention event detected but phone not found");
-  }
-
-  return res.status(200).send("OK");
-}
 
     if (topic !== "message.sender.user") {
       return res.status(200).send("OK");
@@ -1437,38 +1359,6 @@ if (counselorPhones.includes(incomingPhone)) {
   } catch (error) {
     console.error("Webhook Error:", error.response?.data || error.message);
     return res.status(200).send("OK");
-  }
-});
-
-app.post("/resume", async (req, res) => {
-  try {
-    const { phone } = req.body;
-
-    if (!phone) {
-      return res.status(400).json({
-        success: false,
-        error: "Phone number is required"
-      });
-    }
-
-    const formattedPhone = formatWhatsAppPhone(phone);
-    const memory = getConversation(formattedPhone);
-
-    memory.stage = "new";
-
-    conversations.set(formattedPhone, memory);
-
-    return res.json({
-      success: true,
-      message: "AI resumed for this student",
-      phone: formattedPhone,
-      stage: memory.stage
-    });
-  } catch (error) {
-    return res.status(500).json({
-      success: false,
-      error: error.message
-    });
   }
 });
 
