@@ -760,6 +760,24 @@ function isAccountsPaymentIssue(message) {
   );
 }
 
+function isNoNeedIntent(message) {
+  const text = normalize(message);
+
+  return (
+    text === "no" ||
+    text === "nope" ||
+    text === "nothing" ||
+    text === "nothing else" ||
+    text === "not now" ||
+    text === "no thanks" ||
+    text === "no thank you" ||
+    text === "nahi" ||
+    text === "kuch nahi" ||
+    text === "abhi nahi"
+  );
+}
+
+
 async function handleStudentMessage(message, phone = "") {
   const sessionId = getSessionId(phone);
   let memory = getConversation(sessionId);
@@ -839,6 +857,20 @@ if (isStopIntent(message)) {
         : `Thank you for your response. I completely understand. If you ever plan to pursue higher education in the future, feel free to contact me. Wishing you all the best!.`
   };
 }
+
+// If student says no / nothing, don't greet again
+if (isNoNeedIntent(message)) {
+  memory.stage = "new";
+
+  return {
+    type: "no_need",
+    memory,
+    answer:
+      `No problem. 😊\n\n` +
+      `If you need help later with fees, eligibility, hostel, placements, or admission process, just message me.`
+  };
+}
+
 
 // If bot suggested counselor and student says yes
 if (memory.stage === "counselor_suggested" && isPositiveReply(message)) {
