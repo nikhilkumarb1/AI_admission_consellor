@@ -1338,22 +1338,14 @@ app.post("/webhook/aisensy", async (req, res) => {
       return res.status(200).send("OK");
     }
 
-const incomingPhone = formatWhatsAppPhone(phone);
-const counselorPhones = getCounselorPhones();
-
-if (counselorPhones.includes(incomingPhone)) {
-  console.log("Ignoring counselor phone message:", incomingPhone);
-  return res.status(200).send("OK");
-}
-
     const result = await handleStudentMessage(message, phone);
 
-   if (result.answer && result.answer.trim()) {
-  await sendAiSensyReply(phone, result.answer);
-  console.log("AI Reply Sent:", result.answer);
-} else {
-  console.log("AI reply skipped because student is handed over to counselor");
-}
+    if (result.answer && result.answer.trim()) {
+      await sendAiSensyReply(phone, result.answer);
+      console.log("AI Reply Sent:", result.answer);
+    } else {
+      console.log("AI reply skipped because student is stopped/handed over");
+    }
 
     return res.status(200).send("OK");
   } catch (error) {
