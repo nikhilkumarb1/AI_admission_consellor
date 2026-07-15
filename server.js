@@ -785,6 +785,15 @@ async function handleStudentMessage(message, phone = "") {
   updateConversation(sessionId, message);
   memory = getConversation(sessionId);
 
+
+  if (memory.stage === "human_intervened") {
+  return {
+    type: "human_intervened",
+    memory,
+    answer: ""
+  };
+}
+
   const entities = await extractEntities(message, memory);
 
   if (entities.campus) memory.campus = entities.campus;
@@ -1314,10 +1323,53 @@ async function sendAiSensyReply(phone, message) {
   return response.data;
 }
 
+function getPhoneFromAiSensyPayload(body) {
+  return formatWhatsAppPhone(
+    body.data?.message?.phone_number ||
+    body.data?.phone_number ||
+    body.data?.contact?.phone_number ||
+    body.data?.user?.phone_number ||
+    body.phone ||
+    ""
+  );
+}
+
+function isAiSensyInterventionEvent(body) {
+  const text = JSON.stringify(body || {}).toLowerCase();
+
+  return (
+    text.includes("interven") ||
+    text.includes("human") ||
+    text.includes("agent") ||
+    text.includes("assigned") ||
+    text.includes("manual")
+  );
+}
+
+
 app.post("/webhook/aisensy", async (req, res) => {
   try {
     const body = req.body;
     const topic = body.topic;
+
+    console.log("AiSensy Webhook Topic:", topic);
+    console.log("AiSensy Full Payload:", JSON.stringify(body, null, 2));
+
+    if (isAiSensyInterventionEvent(body)) {
+  const intervenedPhone = getPhoneFromAiSensyPayload(body);
+
+  if (intervenedPhone) {
+    const memory = getConversation(intervenedPhone);
+    memory.stage = "human_intervened";
+    conversations.set(intervenedPhone, memory);
+
+    console.log("Human intervened. AI stopped for:", intervenedPhone);
+  } else {
+    console.log("Intervention event detected but phone not found");
+  }
+
+  return res.status(200).send("OK");
+}
 
     if (topic !== "message.sender.user") {
       return res.status(200).send("OK");
@@ -1361,6 +1413,8 @@ if (counselorPhones.includes(incomingPhone)) {
     return res.status(200).send("OK");
   }
 });
+
+
 
 app.listen(PORT, () => {
   console.log(`Server running on ${PORT}`);
