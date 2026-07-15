@@ -275,15 +275,18 @@ function isApplyIntent(message) {
   const text = normalize(message);
 
   return (
-    text === "yes interested" ||
-    text === "yes i am interested" ||
-    text.includes("apply") ||
-    text.includes("admission") ||
-    text.includes("register") ||
-    text.includes("proceed") ||
-    text.includes("interested") ||
-    text.includes("call me")
-    );
+    text.includes("i want to apply") ||
+    text.includes("want to apply") ||
+    text.includes("apply now") ||
+    text.includes("start application") ||
+    text.includes("start admission process") ||
+    text.includes("begin admission process") ||
+    text.includes("proceed with admission") ||
+    text.includes("proceed with application") ||
+    text.includes("i am interested") ||
+    text.includes("yes interested") ||
+    text.includes("register me")
+  );
 }
 
 function isCounselorIntent(message) {
@@ -677,6 +680,61 @@ function getAffordableOptions(data, budgetLakhs, course = "") {
     .slice(0, 5);
 }
 
+function isThanksIntent(message) {
+  const text = normalize(message);
+
+  return (
+    text === "thanks" ||
+    text === "thank you" ||
+    text === "thankyou" ||
+    text === "ok thanks" ||
+    text === "okay thanks" ||
+    text === "ok" ||
+    text === "okay"
+  );
+}
+
+function isFriendAdmissionQuery(message) {
+  const text = normalize(message);
+
+  return (
+    text.includes("my friend") ||
+    text.includes("one of my friends") ||
+    text.includes("for my friend") ||
+    text.includes("not my admission") ||
+    text.includes("its not my admission") ||
+    text.includes("it's not my admission") ||
+    text.includes("for a friend")
+  );
+}
+
+function isCompartmentQuery(message) {
+  const text = normalize(message);
+
+  return (
+    text.includes("compartment") ||
+    text.includes("backlog") ||
+    text.includes("failed") ||
+    text.includes("fail in") ||
+    text.includes("physics compartment") ||
+    text.includes("maths compartment") ||
+    text.includes("chemistry compartment")
+  );
+}
+
+function isPositiveReply(message) {
+  const text = normalize(message);
+
+  return (
+    text === "yes" ||
+    text === "yes please" ||
+    text === "please" ||
+    text === "sure" ||
+    text === "ok" ||
+    text === "okay"
+  );
+}
+
 async function handleStudentMessage(message, phone = "") {
   const sessionId = getSessionId(phone);
   let memory = getConversation(sessionId);
@@ -757,13 +815,75 @@ if (isStopIntent(message)) {
   };
 }
 
+// If bot suggested counselor and student says yes
+if (memory.stage === "counselor_suggested" && isPositiveReply(message)) {
+  memory.stage = "counselor_handoff";
 
-// 2. Counselor handoff check
-if (memory.stage === "counselor_handoff") {
+  const lead = {
+    name: memory.name || "",
+    phone: memory.phone || phone || "",
+    email: memory.email || "",
+    campus: memory.campus || "",
+    course: memory.course || "",
+    message: `[Counselor Requested] ${message}`,
+  };
+
+  await saveLead(lead);
+  await updateLeadStatus(memory.phone || phone, "Counselor Requested").catch(() => {});
+
   return {
-    type: "counselor_handoff_hold",
+    type: "counselor_handoff",
     memory,
-    answer: ""
+    answer:
+      `Sure, I’m connecting you with our admission counselor. ✅\n\n` +
+      `Kindly call our admission counselor\n\n` +
+      `Mr. Rahul Diwan - 76693 15881 - Admission Manager\n` +
+      `Ms. Jaya - 87965 32575 - Education Counselor`
+  };
+}
+
+
+// If student is asking for a friend, don't start application flow directly
+if (isFriendAdmissionQuery(message)) {
+  memory.forWhom = "friend";
+
+  return {
+    type: "friend_query",
+    memory,
+    answer:
+      `Sure, I can help with your friend's admission query. ✅\n\n` +
+      `Please tell me:\n` +
+      `• Preferred campus\n` +
+      `• Course name\n` +
+      `• 12th subjects/percentage\n\n` +
+      `For example: Lucknow, B.Pharma, PCB with 60%.`
+  };
+}
+
+
+// If student says thanks, don't collect lead or send form
+if (isThanksIntent(message)) {
+  return {
+    type: "thanks",
+    memory,
+    answer:
+      `You're welcome. 😊\n\n` +
+      `Let me know if you need help with fees, eligibility, hostel, placement, or admission process.`
+  };
+}
+
+
+// If student asks about compartment/backlog, suggest counselor
+if (isCompartmentQuery(message)) {
+  memory.stage = "counselor_suggested";
+
+  return {
+    type: "counselor_suggested",
+    memory,
+    answer:
+      `In case of a compartment/backlog, eligibility depends on the university rules and final document verification.\n\n` +
+      `It would be better to confirm this with an admission counselor.\n\n` +
+      `Would you like me to connect you with a counselor?`
   };
 }
 
@@ -912,42 +1032,22 @@ if (memory.stage === "asking_budget") {
 }
 
 
-  // Step 3: after details saved, user says Yes/Proceed => send form link
-  if (memory.stage === "details_received" && isApplyIntent(message)) {
-    memory.stage = "documents_pending";
-
-    return {
-      type: "form_link",
-      memory,
-      answer:
-        `Perfect! ✅\n\n` +
-        `Please upload your admission documents using the link below:\n\n` +
-        `${FORM_LINK}\n\n` +
-        `Required Documents:\n` +
-        `• 10th Marksheet\n` +
-        `• 12th Marksheet\n` +
-        `• Aadhaar Card\n` +
-        `• Passport Size Photo\n\n` +
-        `Our counselor will verify your documents and contact you shortly.`
-    };
-  }
-
-  // Step 3 alternate: user says No/Later
-  if (memory.stage === "details_received" && isNegativeIntent(message)) {
-    memory.stage = "counselor_followup";
-
-    return {
-      type: "handoff",
-      memory,
-      answer:
-        `No problem. Our counselor will call you shortly for more queries.`
-    };
-  }
-
   // Step 2: user has shared details after bot asked
   if (memory.stage === "collecting_details") {
+    if (isThanksIntent(message) || isFriendAdmissionQuery(message)) {
+    memory.stage = "new";
+
+    return {
+      type: "not_collecting_details",
+      memory,
+      answer:
+        `No problem. 😊\n\n` +
+        `Please ask your query directly, like course, eligibility, fees, hostel, or placement details.`
+    };
+  }
     const details = await extractLeadDetails(message);
     memory = updateConversation(sessionId, message, details);
+
 
     const lead = {
       name: memory.name || "",
@@ -960,16 +1060,16 @@ if (memory.stage === "asking_budget") {
 
     await saveLead(lead);
 
-    memory.stage = "details_received";
+   memory.stage = "counselor_followup";
 
-    return {
-      type: "lead_saved",
-      memory,
-      answer:
-        `Thank you! ✅\n\n` +
-        `Your details have been received successfully.\n\n` +
-        `Can we begin with the admission process?`
-    };
+return {
+  type: "lead_saved",
+  memory,
+  answer:
+    `Thank you! ✅\n\n` +
+    `Your details have been received successfully.\n\n` +
+    `Our admission counselor will contact you shortly for further guidance.`
+};
   }
 
   // Step 1: user says Yes/Interested/Apply => ask for details only
