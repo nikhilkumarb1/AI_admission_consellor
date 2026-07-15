@@ -5,8 +5,6 @@ import dotenv from "dotenv";
 import OpenAI from "openai";
 import { google } from "googleapis";
 
-
-
 dotenv.config();
 
 const app = express();
@@ -293,7 +291,6 @@ function isCounselorIntent(message) {
   const text = normalize(message);
 
   return (
-    text.includes("yes") ||
     text.includes("connect to counsellor") ||
     text.includes("connect to counselor") ||
     text.includes("connect me to counsellor") ||
