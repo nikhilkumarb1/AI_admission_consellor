@@ -1346,6 +1346,16 @@ function isAiSensyInterventionEvent(body) {
   );
 }
 
+function isAiSensyResolveEvent(body) {
+  const text = JSON.stringify(body || {}).toLowerCase();
+
+  return (
+    text.includes("resolve") ||
+    text.includes("resolved") ||
+    text.includes("conversation_resolved") ||
+    text.includes("chat_resolved")
+  );
+}
 
 app.post("/webhook/aisensy", async (req, res) => {
   try {
@@ -1354,6 +1364,22 @@ app.post("/webhook/aisensy", async (req, res) => {
 
     console.log("AiSensy Webhook Topic:", topic);
     console.log("AiSensy Full Payload:", JSON.stringify(body, null, 2));
+
+    if (isAiSensyResolveEvent(body)) {
+  const resolvedPhone = getPhoneFromAiSensyPayload(body);
+
+  if (resolvedPhone) {
+    const memory = getConversation(resolvedPhone);
+    memory.stage = "new";
+    conversations.set(resolvedPhone, memory);
+
+    console.log("Chat resolved. AI resumed for:", resolvedPhone);
+  } else {
+    console.log("Resolve event detected but phone not found");
+  }
+
+  return res.status(200).send("OK");
+}
 
     if (isAiSensyInterventionEvent(body)) {
   const intervenedPhone = getPhoneFromAiSensyPayload(body);
