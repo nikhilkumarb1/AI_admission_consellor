@@ -1414,7 +1414,37 @@ if (counselorPhones.includes(incomingPhone)) {
   }
 });
 
+app.post("/resume", async (req, res) => {
+  try {
+    const { phone } = req.body;
 
+    if (!phone) {
+      return res.status(400).json({
+        success: false,
+        error: "Phone number is required"
+      });
+    }
+
+    const formattedPhone = formatWhatsAppPhone(phone);
+    const memory = getConversation(formattedPhone);
+
+    memory.stage = "new";
+
+    conversations.set(formattedPhone, memory);
+
+    return res.json({
+      success: true,
+      message: "AI resumed for this student",
+      phone: formattedPhone,
+      stage: memory.stage
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
 
 app.listen(PORT, () => {
   console.log(`Server running on ${PORT}`);
