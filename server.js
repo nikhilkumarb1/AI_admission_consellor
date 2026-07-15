@@ -293,21 +293,41 @@ function isCounselorIntent(message) {
   return (
     text.includes("connect to counsellor") ||
     text.includes("connect to counselor") ||
+    text.includes("connect to councelor") ||
     text.includes("connect me to counsellor") ||
     text.includes("connect me to counselor") ||
+    text.includes("connect me to councelor") ||
+
+    text.includes("connect me with counsellor") ||
+    text.includes("connect me with counselor") ||
+    text.includes("connect me with councelor") ||
+    text.includes("connect with counsellor") ||
+    text.includes("connect with counselor") ||
+    text.includes("connect with councelor") ||
+
     text.includes("talk to counsellor") ||
     text.includes("talk to counselor") ||
+    text.includes("talk to councelor") ||
     text.includes("speak to counsellor") ||
     text.includes("speak to counselor") ||
-    text.includes("counsellor call") ||
-    text.includes("counselor call") ||
-    text.includes("counseller") ||
+    text.includes("speak to councelor") ||
+
     text.includes("counsellor") ||
     text.includes("counselor") ||
+    text.includes("councelor") ||
+    text.includes("counseller") ||
+
+    text.includes("contact number") ||
+    text.includes("contact no") ||
+    text.includes("any contact") ||
+    text.includes("any number") ||
+    text.includes("admission counselor number") ||
+    text.includes("admission counsellor number") ||
+    text.includes("admission contact") ||
+    text.includes("call me") ||
+    text.includes("call back") ||
     text.includes("human agent") ||
-    text.includes("talk to human") ||
-    text.includes("connect with human") ||
-    text.includes("call me")
+    text.includes("talk to human")
   );
 }
 
