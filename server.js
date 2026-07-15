@@ -735,6 +735,31 @@ function isPositiveReply(message) {
   );
 }
 
+function isAccountsPaymentIssue(message) {
+  const text = normalize(message);
+
+  return (
+    text.includes("upi") ||
+    text.includes("net banking") ||
+    text.includes("debit card") ||
+    text.includes("credit card") ||
+    text.includes("payment limit") ||
+    text.includes("max payment") ||
+    text.includes("maximum payment") ||
+    text.includes("not able to pay") ||
+    text.includes("unable to pay") ||
+    text.includes("can't pay") ||
+    text.includes("cannot pay") ||
+    text.includes("payment failed") ||
+    text.includes("payment deducted") ||
+    text.includes("receipt not received") ||
+    text.includes("transaction") ||
+    text.includes("accounts office") ||
+    text.includes("account office") ||
+    text.includes("fee office")
+  );
+}
+
 async function handleStudentMessage(message, phone = "") {
   const sessionId = getSessionId(phone);
   let memory = getConversation(sessionId);
@@ -959,6 +984,33 @@ if (counselorPhones.length) {
       `Ms. Jaya - 87965 32575 - Education Counselor`
   };
 }
+
+// Payment / UPI / transaction / accounts office issue
+if (isAccountsPaymentIssue(message)) {
+  memory.stage = "accounts_payment_issue";
+
+  const lead = {
+    name: memory.name || "",
+    phone: memory.phone || phone || "",
+    email: memory.email || "",
+    campus: memory.campus || "",
+    course: memory.course || "",
+    message: `[Accounts/Payment Issue] ${message}`,
+  };
+
+  await saveLead(lead);
+  await updateLeadStatus(memory.phone || phone, "Accounts/Payment Issue").catch(() => {});
+
+  return {
+    type: "accounts_payment_issue",
+    memory,
+    answer:
+      `I understand your concern.\n\n` +
+      `I can help with admission and course-related queries like fees, eligibility, hostel, placements, and admission process.\n\n` +
+      `For payment mode, UPI limit, transaction, receipt, or fee payment issues, please contact the college accounts/fee office directly.`
+  };
+}
+
 
 // Student says fee is high / expensive
 if (isFeeObjection(message)) {
