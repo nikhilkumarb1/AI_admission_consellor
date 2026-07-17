@@ -50,7 +50,7 @@ async function loadSheetData() {
 
   const response = await sheets.spreadsheets.values.get({
     spreadsheetId: process.env.GOOGLE_SHEET_ID,
-    range: "'Amity University'!A:Z",
+    range: "'Amity_mumbai'!A:I",
   });
 
   const rows = response.data.values || [];
@@ -210,25 +210,48 @@ function normalize(text) {
 
 function detectCampus(message) {
   const text = normalize(message);
-   const campusAliases = {
-    noida: ["noida"],
-    bangalore: ["bangalore", "banglore", "bengaluru", "bengalooru"],
-    lucknow: ["lucknow"],
-    jaipur: ["jaipur"],
-    gurgaon: ["gurgaon", "gurugram"],
-    gwalior: ["gwalior"],
-    mumbai: ["mumbai"],
-    raipur: ["raipur"],
-    mohali: ["mohali"],
-    hyderabad: ["hyderabad"]
-  };
-   for (const [campus, aliases] of Object.entries(campusAliases)) {
-    if (aliases.some(alias => text.includes(alias))) {
-      return campus;
-    }
+
+  // This bot is only for Amity University Mumbai.
+  // Treat general Amity queries as Mumbai queries.
+  if (
+    text.includes("amity") ||
+    text.includes("mumbai") ||
+    text.includes("panvel") ||
+    text.includes("bhatan") ||
+    text.includes("somathne") ||
+    text.includes("somatne")
+  ) {
+    return "mumbai";
   }
 
   return "";
+}
+
+function isOtherCampusQuery(message) {
+  const text = normalize(message);
+
+  const otherCampuses = [
+    "noida",
+    "lucknow",
+    "jaipur",
+    "bangalore",
+    "banglore",
+    "bengaluru",
+    "gurgaon",
+    "gurugram",
+    "gwalior",
+    "raipur",
+    "mohali",
+    "hyderabad"
+  ];
+
+  return otherCampuses.some((campus) => text.includes(campus));
+}
+
+function isGreeting(message) {
+  const text = normalize(message);
+
+  return ["hi", "hello", "hey", "hii", "hlo", "namaste"].includes(text);
 }
 function detectTopic(message) {
   const text = normalize(message);
@@ -261,12 +284,37 @@ function detectTopic(message) {
 function detectCourse(message) {
   const text = normalize(message);
 
-  const courses = [
-    "btech cse", "btech it", "btech", "bba", "bca", "mba",
-    "mca", "ba llb", "bcom", "bsc", "msc"
+  const courseAliases = [
+    { value: "btech cse", aliases: ["btech cse", "b tech cse", "computer science", "computer science engineering", "cse"] },
+    { value: "btech ai", aliases: ["btech ai", "b tech ai", "ai ml", "ai and ml", "artificial intelligence", "machine learning"] },
+    { value: "btech cloud computing", aliases: ["cloud computing", "cyber security", "cloud", "cyber"] },
+    { value: "btech data science", aliases: ["data science", "data sciences"] },
+    { value: "btech civil", aliases: ["civil", "civil engineering"] },
+    { value: "btech ece", aliases: ["ece", "electronics", "electronics communication", "electronics and communication"] },
+    { value: "btech mechanical", aliases: ["mechanical", "mechanical engineering"] },
+    { value: "btech aerospace", aliases: ["aerospace"] },
+    { value: "btech aeronautical", aliases: ["aeronautical"] },
+    { value: "btech automobile", aliases: ["automobile"] },
+    { value: "btech", aliases: ["btech", "b tech", "engineering"] },
+
+    { value: "bca", aliases: ["bca", "bachelor of computer application", "computer application"] },
+    { value: "bba", aliases: ["bba", "business administration", "management"] },
+    { value: "bcom", aliases: ["bcom", "b com", "commerce"] },
+    { value: "ba llb", aliases: ["ba llb", "ballb", "law"] },
+    { value: "bba llb", aliases: ["bba llb", "bballb"] },
+    { value: "b pharma", aliases: ["b pharma", "bpharma", "b pharmacy", "pharmacy", "b pharm"] },
+    { value: "b des", aliases: ["b des", "bdes", "design", "fashion design", "interior design"] },
+    { value: "ba jmc", aliases: ["ba jmc", "journalism", "mass communication", "jmc"] },
+    { value: "animation", aliases: ["animation", "vfx", "visual graphics", "multimedia", "gaming"] }
   ];
 
-  return courses.find((course) => text.includes(course)) || "";
+  for (const course of courseAliases) {
+    if (course.aliases.some((alias) => text.includes(alias))) {
+      return course.value;
+    }
+  }
+
+  return "";
 }
 
 function isApplyIntent(message) {
@@ -374,7 +422,7 @@ ${message}
 }
 
 function findRelevantRows(data, message, memory, entities = {}) {
-  const campus = entities.campus || detectCampus(message) || memory.campus || "";
+  const campus = "mumbai";
   const course = entities.course || detectCourse(message) || memory.course || "";
 
   const detectedTopic = entities.topic || detectTopic(message);
@@ -437,7 +485,7 @@ if (course && topicNeedsCourse[finalTopic]) {
 }
 async function formatAnswer(message, searchResult) {
   const prompt = `
-You are an Amity University admission counselor on WhatsApp.
+You are an Amity University Mumbai admission counselor on WhatsApp.
 
 Rules:
 1. Answer only using matched data.
@@ -461,7 +509,7 @@ ${JSON.stringify(searchResult.rows, null, 2)}
     model: "gpt-4.1-mini",
     temperature: 0.2,
     messages: [
-      { role: "system", content: "You are a helpful Amity admission counselor." },
+      { role: "system", content: "You are a helpful Amity University Mumbai admission counselor." },
       { role: "user", content: prompt },
     ],
   });
@@ -472,7 +520,7 @@ ${JSON.stringify(searchResult.rows, null, 2)}
 
 
 app.get("/", (req, res) => {
-  res.send("Amity Bot Running 🚀");
+  res.send("Amity Mumbai Bot Running 🚀");
 });
 
 function detectDocument(message) {
@@ -507,19 +555,21 @@ function documentLabel(doc) {
 
 async function extractEntities(message, memory = {}) {
   const prompt = `
-Extract entities from this student message for an Amity admission chatbot.
+Extract entities from this student message for an Amity University Mumbai admission chatbot.
 
 Return ONLY valid JSON.
 
-Allowed campuses:
-noida, bangalore, lucknow, jaipur, gurgaon, gwalior, mumbai, raipur, mohali, hyderabad
+Allowed campus:
+mumbai
 
 Allowed topics:
 Fees, Courses, Hostel, Placement, Scholarship, Eligibility, Admission_Process, Application_Fee, General
 
 Rules:
 - Correct spelling mistakes like banglore -> bangalore.
-- If user asks "what about noida", keep previous course/topic from memory.
+- This bot is only for Amity University Mumbai.
+- If campus is missing, always use mumbai.
+- If user asks about any other Amity campus, still keep campus as mumbai and the app will handle it separately.
 - If something is missing, use memory.
 - If still unknown, keep empty.
 
@@ -816,24 +866,65 @@ async function handleStudentMessage(message, phone = "") {
   if (newCourse) memory.course = newCourse;
   if (newTopic !== "General") memory.lastTopic = newTopic;
 
-  if (memory.campus === "noida") {
-  return {
-    type: "noida_reserved",
-    memory,
-    answer:
-      `Sorry, seats for Amity Noida are currently reserved.\n\n` +
-      `You can choose another campus:\n` +
-      `• Lucknow\n` +
-      `• Jaipur\n` +
-      `• Mumbai\n` +
-      `• Bengaluru\n` +
-      `• Raipur\n` +
-      `• Mohali\n` +
-      `• Gurgaon\n` +
-      `• Gwalior\n` +
-      `• Hyderabad`
-  };
-}
+  // This bot is only for Amity University Mumbai
+  if (isOtherCampusQuery(message)) {
+    memory.campus = "mumbai";
+
+    return {
+      type: "only_mumbai",
+      memory,
+      answer:
+        `This admission assistant is currently for Amity University Mumbai only.
+
+` +
+        `I can help you with Amity Mumbai:
+` +
+        `• Courses
+` +
+        `• Fees
+` +
+        `• Hostel
+` +
+        `• Placements
+` +
+        `• Eligibility
+` +
+        `• Admission process`
+    };
+  }
+
+  // Default campus is always Mumbai for this bot
+  memory.campus = "mumbai";
+
+  if (isGreeting(message)) {
+    return {
+      type: "greeting",
+      memory,
+      answer:
+        `Hello! 👋
+
+` +
+        `Welcome to Amity University Mumbai Admission Assistant.
+
+` +
+        `I can help you with:
+` +
+        `• Courses
+` +
+        `• Fees
+` +
+        `• Hostel
+` +
+        `• Placements
+` +
+        `• Eligibility
+` +
+        `• Admission Process
+
+` +
+        `You can ask questions like: BTech CSE fees, hostel details, BBA fees, B.Pharma eligibility, or placements.`
+    };
+  }
 
 
 // 1. Stop/Not interested check
@@ -1186,10 +1277,10 @@ return {
         `👤 Full Name\n` +
         `📞 Phone Number\n` +
         `📧 Email ID\n` +
-        `🏫 Preferred Campus\n` +
+        `🏫 Preferred Campus (Mumbai)\n` +
         `🎓 Preferred Course\n\n` +
         `Example:\n` +
-        `My name is John Doe, phone 9999999999, email john.doe@gmail.com, campus Lucknow, course BTech CSE`
+        `My name is John Doe, phone 9999999999, email john.doe@gmail.com, campus Mumbai, course BTech CSE`
     };
   }
 
@@ -1214,32 +1305,6 @@ Topic: ${memory.lastTopic || "Not provided"}
 
   console.log("\n========== SEARCH ==========");
   console.log(searchResult);
-
-  // Ask for campus if missing
-if (
-  searchResult.topic !== "General" &&
-  !searchResult.campus &&
-  ["Fees", "Hostel", "Placement", "Scholarship", "Admission_Process"].includes(searchResult.topic)
-) {
-  return {
-    type: "missing_campus",
-    memory,
-    answer:
-      `The information depends on the campus.\n\n` +
-      `Could you please tell me which Amity campus you're interested in?\n\n` +
-      `• Noida\n` +
-      `• Lucknow\n` +
-      `• Jaipur\n` +
-      `• Mumbai\n` +
-      `• Bengaluru\n` +
-      `• Raipur\n` +
-      `• Mohali\n` +
-      `• Gwalior\n` +
-      `• Gurgaon\n` +
-      `• Hyderabad`
-  };
-}
-
 
 // Ask for course if missing
 if (
